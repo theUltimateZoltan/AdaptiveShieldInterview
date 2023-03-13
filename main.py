@@ -1,12 +1,12 @@
 import enum
 import os.path
-
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Set
 from collections import defaultdict
 import requests
 import shutil
+from threading import Thread
 from copy import copy
 
 class Column(enum.Enum):
@@ -29,7 +29,8 @@ class Animal:
         unprocessed_name = details[Column.ANIMAL.value].text
         self.name = Animal.process_name(unprocessed_name)
         self.link = WIKIPEDIA + details[Column.ANIMAL.value].find("a")["href"]
-
+        self.image_finder = Thread(target=self.__find_image_details)
+        self.image_finder.start()
 
     @staticmethod
     def extract_details_from_row(row: Tag) -> Union[list, None]:
@@ -53,24 +54,25 @@ class Animal:
     def process_collateral_adjectives(adjectives: List[str]) -> List[str]:
         return [adj.capitalize().strip() for adj in adjectives if adj.isalpha()]  # screen redundant comments and marks
 
-    def download_image(self):
+    def __find_image_details(self):
         page_html = requests.get(self.link).content
         page = BeautifulSoup(page_html, features="html.parser")
         image_base_element = page.find("table", class_="infobox")
         if not image_base_element:
             image_base_element = page.find("div", class_="thumb")
         if image_base_element:
-            image_url = "https:" + image_base_element.find("img")["src"]
-            image_suffix = image_url.split(".")[-1]
-            self.image_local_path = f'/tmp/{ self.name.split("/")[0].replace(" ", "_") }.{ image_suffix }'
-            Animal.download_any_binary(image_url, self.image_local_path)
+            self.image_url = "https:" + image_base_element.find("img")["src"]
+            image_suffix = self.image_url.split(".")[-1]
+            self.image_local_path = f'/tmp/{self.name.split("/")[0].replace(" ", "_")}.{image_suffix}'
+
+    def download_image(self):
+        self.image_finder.join()
+        Animal.download_any_binary(self.image_url, self.image_local_path)
 
     @staticmethod
     def download_any_binary(url: str, local_path: str, use_cached=True):
         if use_cached and os.path.exists(local_path):
-            print(f"{local_path} cached.")
             return
-        print(f"Downloading {local_path}...")
         response = requests.get(url, stream=True)
         if response.status_code == 200:
             with open(local_path, 'wb') as f:
@@ -98,14 +100,23 @@ class AnimalsTable:
                 animal = Animal(row)
                 for adjective in animal.collateral_adjectives:
                     mapping[adjective].append(animal)
-                animal.download_image()
 
         return mapping
+
+    def animals_set(self) -> Set[Animal]:
+        return set().union(*[set(animals) for animals in self.__collateral_adjective_map.values()])
+
+    def download_images(self):
+        for animal in self.animals_set():
+            animal.download_image()
 
     def __str__(self):
         representation = str()
         for col_adj, animals_list in self.__collateral_adjective_map.items():
-            animal_items = [f"{animal.name} [ file://{animal.image_local_path} ]" for animal in animals_list ]
+            animal_items = list()
+            for animal in animals_list:
+                animal.image_finder.join()
+                animal_items.append(f"{animal.name} [ file://{animal.image_local_path} ]")
             representation += col_adj + ": " + ", ".join(animal_items) + "\n"
         return representation
 
@@ -113,3 +124,4 @@ class AnimalsTable:
 if __name__ == '__main__':
     table = AnimalsTable()
     print(table)
+    table.download_images()
