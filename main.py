@@ -53,7 +53,7 @@ class Animal:
     def process_collateral_adjectives(adjectives: List[str]) -> List[str]:
         return [adj.capitalize().strip() for adj in adjectives if adj.isalpha()]  # screen redundant comments and marks
 
-    def download_image(self, use_cached=True):
+    def download_image(self):
         page_html = requests.get(self.link).content
         page = BeautifulSoup(page_html, features="html.parser")
         image_base_element = page.find("table", class_="infobox")
@@ -63,15 +63,20 @@ class Animal:
             image_url = "https:" + image_base_element.find("img")["src"]
             image_suffix = image_url.split(".")[-1]
             self.image_local_path = f'/tmp/{ self.name.split("/")[0].replace(" ", "_") }.{ image_suffix }'
-            if use_cached and os.path.exists(self.image_local_path):
-                print(f"{self.image_local_path} cached.")
-                return
-            print(f"Downloading {self.image_local_path}...")
-            response = requests.get(image_url, stream=True)
-            if response.status_code == 200:
-                with open(self.image_local_path, 'wb') as f:
-                    response.raw.decode_content = True
-                    shutil.copyfileobj(response.raw, f)
+            Animal.download_any_binary(image_url, self.image_local_path)
+
+    @staticmethod
+    def download_any_binary(url: str, local_path: str, use_cached=True):
+        if use_cached and os.path.exists(local_path):
+            print(f"{local_path} cached.")
+            return
+        print(f"Downloading {local_path}...")
+        response = requests.get(url, stream=True)
+        if response.status_code == 200:
+            with open(local_path, 'wb') as f:
+                response.raw.decode_content = True
+                shutil.copyfileobj(response.raw, f)
+
 
 class AnimalsTable:
     def __init__(self):
