@@ -44,7 +44,7 @@ class Animal:
 
     @staticmethod
     def process_name(name: str) -> str:
-        exit_phrases = ["(", "[", " also see", " see"]
+        exit_phrases = ["(", "[", "also see", " see"]
         stripped_name = copy(name).capitalize()
         for exit_phrase in exit_phrases:
             stripped_name = stripped_name.split(exit_phrase)[0]
@@ -82,8 +82,8 @@ class Animal:
 
 class AnimalsTable:
     def __init__(self):
-        table_element = AnimalsTable.get_animals_table_element()
-        self.__collateral_adjective_map = AnimalsTable.parse_html_table(table_element)
+        self.__table_element = AnimalsTable.get_animals_table_element()
+        self.__collateral_adjective_map = AnimalsTable.parse_html_table(self.__table_element)
 
     @staticmethod
     def get_animals_table_element() -> Tag:
@@ -110,6 +110,9 @@ class AnimalsTable:
         for animal in self.animals_set():
             animal.download_image()
 
+    def get_wiki_table_row(self, index: int) -> Tag:
+        return self.__table_element.find_all("tr")[index]
+
     def __str__(self):
         representation = str()
         for col_adj, animals_list in self.__collateral_adjective_map.items():
@@ -124,4 +127,6 @@ class AnimalsTable:
 if __name__ == '__main__':
     table = AnimalsTable()
     print(table)
+    print("Please wait while images are being downloaded...")
     table.download_images()
+    print("Images downloaded.")

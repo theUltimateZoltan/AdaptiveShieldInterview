@@ -1,6 +1,7 @@
 [packages]
 requests = "*"
 beautifulsoup4 = "*"
+pytest = "*"
 
 [requires]
 python_version = "3.10"
